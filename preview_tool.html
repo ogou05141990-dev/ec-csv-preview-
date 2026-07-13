@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>商品説明プレビューツール</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; background: #1c1c1e; color: #f0f0f0; }
+
+/* ===== UPLOAD ===== */
+#upload-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100vh; gap: 20px;
+}
+#upload-screen h1 { font-size: 20px; font-weight: 700; color: #fff; }
+
+.platform-cards { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+.card {
+  width: 200px; border: 2px dashed #444; border-radius: 12px;
+  padding: 32px 16px; text-align: center; cursor: pointer;
+  background: #2a2a2e; transition: border-color 0.15s, background 0.15s;
+}
+.card:hover, .card.over { border-color: var(--col); background: var(--col-bg); }
+.card .emoji { font-size: 32px; margin-bottom: 8px; }
+.card .name { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.card .sub { font-size: 11px; color: #777; }
+.card .cols { font-size: 11px; color: #555; margin-top: 8px; line-height: 1.6; }
+
+#card-rakuten  { --col: #bf0000; --col-bg: #2a1a1a; }
+#card-yahoo    { --col: #ff0033; --col-bg: #2a1a1e; }
+#card-future   { --col: #0066cc; --col-bg: #1a1e2a; }
+
+#upload-note { font-size: 12px; color: #555; }
+
+/* ===== APP ===== */
+#app { display: none; flex-direction: column; height: 100vh; }
+
+#topbar {
+  height: 48px; min-height: 48px; background: #111;
+  border-bottom: 2px solid var(--platform-col, #888);
+  display: flex; align-items: center; padding: 0 16px; gap: 10px;
+}
+#topbar .title { font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap; }
+#platform-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  padding: 3px 8px; border-radius: 4px;
+  background: var(--platform-col, #888); color: #fff;
+}
+#item-select {
+  margin-left: 16px; background: #2a2a2e; border: 1px solid #444;
+  color: #fff; padding: 5px 12px; border-radius: 6px;
+  font-size: 13px; font-family: inherit; min-width: 240px; cursor: pointer;
+}
+#item-select:focus { outline: none; border-color: var(--platform-col, #888); }
+#item-count { font-size: 12px; color: #666; white-space: nowrap; }
+#reset-btn {
+  margin-left: auto; background: #333; color: #ccc; border: none;
+  padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+#reset-btn:hover { background: #444; }
+
+#preview-area { display: flex; flex-direction: row; flex: 1; overflow: hidden; }
+
+.pane { flex: 1; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid #2a2a2a; }
+.pane:last-child { border-right: none; }
+
+.pane-head {
+  height: 36px; min-height: 36px; background: #1e1e1e; border-bottom: 1px solid #2a2a2a;
+  display: flex; align-items: center; padding: 0 14px; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #888; text-transform: uppercase;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot-pc   { background: #e04040; }
+.dot-sp   { background: #3a80d2; }
+.dot-text { background: #50a050; }
+.dot-fs   { background: #0066cc; }
+
+.pane-body {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  background: #d0d0d0; padding: 20px 16px;
+}
+.pane-body::-webkit-scrollbar { width: 5px; }
+.pane-body::-webkit-scrollbar-track { background: #1a1a1a; }
+.pane-body::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+.pane-body.text-pane { background: #1e1e22; padding: 20px; }
+.text-content { font-size: 13px; line-height: 1.85; color: #ccc; white-space: pre-wrap; word-break: break-word; }
+
+.frame {
+  background: #fff; color: #333; border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3); padding: 16px;
+  font-size: 13px; line-height: 1.75; word-break: break-word;
+}
+.frame img { max-width: 100%; height: auto; }
+.frame-sp  { max-width: 390px; margin: 0 auto; }
+.no-data   { text-align: center; color: #888; font-size: 13px; padding: 48px 16px; }
+.placeholder { text-align: center; color: #555; font-size: 14px; padding: 80px 20px; }
+</style>
+</head>
+<body>
+
+<!-- アップロード画面 -->
+<div id="upload-screen">
+  <h1>📦 商品説明プレビューツール</h1>
+  <div class="platform-cards">
+
+    <div class="card" id="card-rakuten"
+         onclick="document.getElementById('file-rakuten').click()"
+         ondragover="ev(event,'rakuten',true)" ondragleave="ev(event,'rakuten',false)"
+         ondrop="drop(event,'rakuten')">
+      <div class="emoji">🛒</div>
+      <div class="name">楽天</div>
+      <div class="sub">dl-normal-item.csv</div>
+      <div class="cols">PC用商品説明文<br>スマートフォン用商品説明文</div>
+    </div>
+
+    <div class="card" id="card-yahoo"
+         onclick="document.getElementById('file-yahoo').click()"
+         ondragover="ev(event,'yahoo',true)" ondragleave="ev(event,'yahoo',false)"
+         ondrop="drop(event,'yahoo')">
+      <div class="emoji">🟡</div>
+      <div class="name">Yahoo!</div>
+      <div class="sub">data_input***.csv</div>
+      <div class="cols">caption (PC)<br>sp-additional (SP)<br>explanation (テキスト)</div>
+    </div>
+
+    <div class="card" id="card-future"
+         onclick="document.getElementById('file-future').click()"
+         ondragover="ev(event,'future',true)" ondragleave="ev(event,'future',false)"
+         ondrop="drop(event,'future')">
+      <div class="emoji">🔵</div>
+      <div class="name">futureshop</div>
+      <div class="sub">ccGoods_***.csv</div>
+      <div class="cols">商品説明（大）<br>商品説明（小）</div>
+    </div>
+
+  </div>
+  <div id="upload-note">CSVをカードにドロップ、またはクリックして選択</div>
+  <input type="file" id="file-rakuten" accept=".csv" onchange="loadFile(this.files[0],'rakuten')" style="display:none">
+  <input type="file" id="file-yahoo"   accept=".csv" onchange="loadFile(this.files[0],'yahoo')"   style="display:none">
+  <input type="file" id="file-future"  accept=".csv" onchange="loadFile(this.files[0],'future')"  style="display:none">
+</div>
+
+<!-- アプリ本体 -->
+<div id="app">
+  <div id="topbar">
+    <span class="title" id="topbar-title">プレビュー</span>
+    <span id="platform-badge">-</span>
+    <select id="item-select" onchange="renderPreview()"></select>
+    <span id="item-count"></span>
+    <button id="reset-btn" onclick="resetApp()">← 別のCSVを開く</button>
+  </div>
+  <div id="preview-area"></div>
+</div>
+
+<script>
+let itemMap = {};
+let itemOrder = [];
+let currentPlatform = '';
+
+function ev(e, p, on) { e.preventDefault(); document.getElementById('card-'+p).classList.toggle('over', on); }
+function drop(e, p) {
+  e.preventDefault(); document.getElementById('card-'+p).classList.remove('over');
+  const f = e.dataTransfer.files[0]; if (f) loadFile(f, p);
+}
+
+function loadFile(file, platform) {
+  const reader = new FileReader();
+  reader.onload = e => init(e.target.result, platform);
+  reader.readAsText(file, 'Shift-JIS');
+}
+
+// CSV parser（セル内改行完全対応）
+function parseCSV(text) {
+  const records = [];
+  let row = [], cur = '', inQ = false, i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"' && i+1 < text.length && text[i+1] === '"') { cur += '"'; i += 2; }
+      else if (c === '"') { inQ = false; i++; }
+      else { cur += c; i++; }
+    } else {
+      if      (c === '"') { inQ = true; i++; }
+      else if (c === ',') { row.push(cur); cur = ''; i++; }
+      else if (c === '\r' && i+1 < text.length && text[i+1] === '\n') {
+        row.push(cur); records.push(row); row = []; cur = ''; i += 2;
+      } else if (c === '\n' || c === '\r') {
+        row.push(cur); records.push(row); row = []; cur = ''; i++;
+      } else { cur += c; i++; }
+    }
+  }
+  if (cur || row.length > 0) { row.push(cur); if (row.some(v => v !== '')) records.push(row); }
+  if (records.length < 2) return { h: [], rows: [] };
+  return { h: records[0], rows: records.slice(1) };
+}
+
+function colIdx(h, names) {
+  for (const n of names) { const i = h.indexOf(n); if (i !== -1) return i; }
+  for (const n of names) {
+    const clean = n.replace(/\s/g,'');
+    const i = h.findIndex(c => c.replace(/\s/g,'').includes(clean));
+    if (i !== -1) return i;
+  }
+  return -1;
+}
+
+function init(text, platform) {
+  currentPlatform = platform;
+  const { h, rows } = parseCSV(text);
+  itemMap = {}; itemOrder = [];
+
+  if (platform === 'rakuten') {
+    const iItem = colIdx(h, ['商品番号','商品管理番号（商品URL）','商品管理番号']);
+    const iPC   = colIdx(h, ['PC用商品説明文']);
+    const iSP   = colIdx(h, ['スマートフォン用商品説明文','スマホ用商品説明文']);
+    const iSale = colIdx(h, ['PC用販売説明文']);
+    if (iItem === -1) { alert('商品番号列が見つかりません'); return; }
+    let cur = null;
+    for (const row of rows) {
+      const no = (row[iItem]||'').trim();
+      if (no) { cur = no; if (!itemMap[cur]) { itemMap[cur]={pc:'',sp:'',sale:''}; itemOrder.push(cur); } }
+      if (!cur) continue;
+      if (iPC   !== -1 && row[iPC]   && !itemMap[cur].pc)   itemMap[cur].pc   = row[iPC];
+      if (iSP   !== -1 && row[iSP]   && !itemMap[cur].sp)   itemMap[cur].sp   = row[iSP];
+      if (iSale !== -1 && row[iSale] && !itemMap[cur].sale) itemMap[cur].sale = row[iSale];
+    }
+
+  } else if (platform === 'yahoo') {
+    const iCode = colIdx(h, ['code']);
+    const iCap  = colIdx(h, ['caption']);
+    const iExp  = colIdx(h, ['explanation']);
+    const iSP   = colIdx(h, ['sp-additional']);
+    if (iCode === -1) { alert('code列が見つかりません'); return; }
+    for (const row of rows) {
+      const no = (row[iCode]||'').trim(); if (!no) continue;
+      if (!itemMap[no]) { itemMap[no]={pc:'',sp:'',text:''}; itemOrder.push(no); }
+      if (iCap !== -1 && row[iCap]) itemMap[no].pc   = row[iCap];
+      if (iSP  !== -1 && row[iSP])  itemMap[no].sp   = row[iSP];
+      if (iExp !== -1 && row[iExp])  itemMap[no].text = row[iExp];
+    }
+
+  } else if (platform === 'future') {
+    const iCode = colIdx(h, ['商品URLコード','商品番号']);
+    const iName = colIdx(h, ['商品名']);
+    const iBig  = colIdx(h, ['商品説明（大）','商品説明(大)']);
+    const iSmall= colIdx(h, ['商品説明（小）','商品説明(小)']);
+    if (iCode === -1) { alert('商品URLコード列が見つかりません'); return; }
+    for (const row of rows) {
+      const no = (row[iCode]||'').trim(); if (!no) continue;
+      if (!itemMap[no]) { itemMap[no]={pc:'',small:'',name:''}; itemOrder.push(no); }
+      if (iName  !== -1 && row[iName])  itemMap[no].name  = row[iName];
+      if (iBig   !== -1 && row[iBig])   itemMap[no].pc    = row[iBig];
+      if (iSmall !== -1 && row[iSmall]) itemMap[no].small = row[iSmall];
+    }
+  }
+
+  // セレクト構築
+  const sel = document.getElementById('item-select');
+  sel.innerHTML = '';
+  for (const no of itemOrder) {
+    const o = document.createElement('option');
+    o.value = no;
+    // futureは商品名も表示
+    o.textContent = (platform === 'future' && itemMap[no].name)
+      ? no + '　' + itemMap[no].name.slice(0,20)
+      : no;
+    sel.appendChild(o);
+  }
+  document.getElementById('item-count').textContent = itemOrder.length + ' 件';
+
+  // トップバー・カラー設定
+  const config = {
+    rakuten: { title: '🛒 楽天 商品説明プレビュー',       badge: 'Rakuten',    col: '#bf0000' },
+    yahoo:   { title: '🟡 Yahoo! 商品説明プレビュー',     badge: 'Yahoo!',     col: '#ff0033' },
+    future:  { title: '🔵 futureshop 商品説明プレビュー', badge: 'futureshop', col: '#0066cc' },
+  }[platform];
+  document.getElementById('topbar-title').textContent = config.title;
+  document.getElementById('platform-badge').textContent = config.badge;
+  document.getElementById('app').style.setProperty('--platform-col', config.col);
+
+  buildPanes(platform);
+
+  document.getElementById('upload-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  if (itemOrder.length > 0) renderPreview();
+}
+
+function buildPanes(platform) {
+  const area = document.getElementById('preview-area');
+  if (platform === 'rakuten') {
+    area.innerHTML = `
+      <div class="pane">
+        <div class="pane-head"><span class="dot dot-pc"></span>PC用商品説明文</div>
+        <div class="pane-body" id="pc-body"><div class="placeholder">商品を選択</div></div>
+      </div>
+      <div class="pane">
+        <div class="pane-head"><span class="dot dot-sp"></span>スマートフォン用商品説明文</div>
+        <div class="pane-body" id="sp-body"><div class="placeholder">商品を選択</div></div>
+      </div>
+      <div class="pane">
+        <div class="pane-head"><span class="dot dot-text"></span>PC用販売説明文</div>
+        <div class="pane-body" id="sale-body"><div class="placeholder">商品を選択</div></div>
+      </div>`;
+  } else if (platform === 'yahoo') {
+    area.innerHTML = `
+      <div class="pane">
+        <div class="pane-head"><span class="dot dot-pc"></span>caption（PC用）</div>
+        <div class="pane-body" id="pc-body"><div class="placeholder">商品を選択</div></div>
+      </div>
+      <div class="pane">
+        <div class="pane-head"><span class="dot dot-sp"></span>sp-additional（スマホ用）</div>
+        <div class="pane-body" id="sp-body"><div class="placeholder">商品を選択</div></div>
+      </div>
+      <div class="pane" style="max-width:280px;">
+        <div class="pane-head"><span class="dot dot-text"></span>explanation（テキスト）</div>
+        <div class="pane-body text-pane" id="text-body"><div class="placeholder">商品を選択</div></div>
+      </div>`;
+  } else if (platform === 'future') {
+    area.innerHTML = `
+      <div class="pane">
+        <div class="pane-head"><span class="dot dot-fs"></span>商品説明（大）</div>
+        <div class="pane-body" id="pc-body"><div class="placeholder">商品を選択</div></div>
+      </div>`;
+  }
+}
+
+function renderPreview() {
+  const no = document.getElementById('item-select').value;
+  const d = itemMap[no] || {};
+
+  const pcEl   = document.getElementById('pc-body');
+  const spEl   = document.getElementById('sp-body');
+  const textEl = document.getElementById('text-body');
+  const saleEl = document.getElementById('sale-body');
+
+  if (pcEl) {
+    pcEl.innerHTML = d.pc
+      ? '<div class="frame">' + d.pc + '</div>'
+      : '<div class="no-data">（データなし）</div>';
+  }
+  if (spEl) {
+    spEl.innerHTML = d.sp
+      ? '<div class="frame frame-sp">' + d.sp + '</div>'
+      : '<div class="no-data">（データなし）</div>';
+  }
+  if (saleEl) {
+    saleEl.innerHTML = d.sale
+      ? '<div class="frame">' + d.sale + '</div>'
+      : '<div class="no-data">（データなし）</div>';
+  }
+  if (textEl) {
+    const content = d.text || d.small || '';
+    textEl.innerHTML = content
+      ? (currentPlatform === 'yahoo'
+          ? '<div class="text-content">' + escapeHtml(content) + '</div>'
+          : '<div class="frame">' + content + '</div>')
+      : '<div class="no-data">（データなし）</div>';
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function resetApp() {
+  itemMap = {}; itemOrder = []; currentPlatform = '';
+  ['file-rakuten','file-yahoo','file-future'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('upload-screen').style.display = 'flex';
+}
+</script>
+</body>
+</html>
